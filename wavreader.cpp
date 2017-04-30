@@ -224,7 +224,7 @@ size_t WavReader::decodeUxToI16(int16_t *buffer, size_t frames)
             sample = static_cast<int16_t>(frame_[channel]) - 128;
             sample = static_cast<int16_t>(sample << 8);
 
-            buffer[frame_index * 2 + channel] = sample;
+            buffer[frame_index * channels_ + channel] = sample;
         }
     }
 
@@ -249,7 +249,7 @@ size_t WavReader::decodeIxToI16(int16_t *buffer, size_t frames)
 
             sample_pointer += channel_size_;
 
-            buffer[frame_index * 2 + channel] = le16toh(sample);
+            buffer[frame_index * channels_ + channel] = le16toh(sample);
         }
     }
 
