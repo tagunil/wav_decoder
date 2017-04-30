@@ -3,25 +3,25 @@
 #include <cstring>
 #include <endian.h>
 
-WavReader::WavReader(void *file_context,
-                     TellCallback tell_callback,
+WavReader::WavReader(TellCallback tell_callback,
                      SeekCallback seek_callback,
                      ReadCallback read_callback)
     : opened_(false),
-      file_context_(file_context),
       tell_callback_(tell_callback),
       seek_callback_(seek_callback),
       read_callback_(read_callback)
 {
 }
 
-bool WavReader::open()
+bool WavReader::open(void *file_context)
 {
     char chunk_id[4];
     uint32_t chunk_size;
     size_t next_chunk_offset;
 
     opened_ = false;
+
+    file_context_ = file_context;
 
     if (!seek(0)) {
         return false;
@@ -204,6 +204,10 @@ bool WavReader::open()
 
 size_t WavReader::decodeToI16(int16_t *buffer, size_t frames)
 {
+    if (!opened_) {
+        return 0;
+    }
+
     if (channel_size_ == 1) {
         return decodeUxToI16(buffer, frames);
     } else {

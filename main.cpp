@@ -51,12 +51,11 @@ int main(int argc, char *argv[])
         return 1;
     }
 
-    WavReader reader(wav_file,
-                     &tell_callback,
+    WavReader reader(&tell_callback,
                      &seek_callback,
                      &read_callback);
 
-    if (!reader.open()) {
+    if (!reader.open(wav_file)) {
         fprintf(stderr, "Cannot parse WAV file header\n");
         return 1;
     }

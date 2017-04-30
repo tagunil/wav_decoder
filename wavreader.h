@@ -20,12 +20,11 @@ public:
     static const unsigned int MAX_FRAME_SIZE = 16;
 
 public:
-    WavReader(void *file_context,
-              TellCallback tell_callback,
+    WavReader(TellCallback tell_callback,
               SeekCallback seek_callback,
               ReadCallback read_callback);
 
-    bool open();
+    bool open(void *file_context);
 
     size_t decodeToI16(int16_t *buffer, size_t frames);
 
