@@ -41,7 +41,7 @@ size_t read_callback(void *file_context, uint8_t *buffer, size_t length)
 int main(int argc, char *argv[])
 {
     if (argc < 2) {
-        fprintf(stderr, "Usage: %s <file>\n", argv[0]);
+        fprintf(stderr, "Usage: %s <file> [mode]\n", argv[0]);
         return 1;
     }
 
@@ -55,14 +55,36 @@ int main(int argc, char *argv[])
                      &seek_callback,
                      &read_callback);
 
-    if (!reader.open(wav_file)) {
+    WavReader::Mode mode = WavReader::Mode::Single;
+
+    if (argc >= 3) {
+        switch (argv[2][0]) {
+        case 'c':
+            mode = WavReader::Mode::Continuous;
+            break;
+        case 's':
+        default:
+            mode = WavReader::Mode::Single;
+        }
+    }
+
+    switch (mode) {
+    case WavReader::Mode::Single:
+        printf("Single mode\n");
+        break;
+    case WavReader::Mode::Continuous:
+        printf("Continuous mode\n");
+        break;
+    }
+
+    if (!reader.open(wav_file, mode)) {
         fprintf(stderr, "Cannot parse WAV file header\n");
         return 1;
     }
 
     printf("Format: ");
     switch (reader.format()) {
-    case WavReader::Format::PCM:
+    case WavReader::Format::Pcm:
         printf("PCM\n");
         break;
     }

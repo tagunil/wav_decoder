@@ -13,7 +13,8 @@ WavReader::WavReader(TellCallback tell_callback,
 {
 }
 
-bool WavReader::open(void *file_context)
+bool WavReader::open(void *file_context,
+                     WavReader::Mode mode)
 {
     char chunk_id[4];
     uint32_t chunk_size;
@@ -22,6 +23,8 @@ bool WavReader::open(void *file_context)
     opened_ = false;
 
     file_context_ = file_context;
+
+    mode_ = mode;
 
     if (!seek(0)) {
         return false;
@@ -75,8 +78,8 @@ bool WavReader::open(void *file_context)
     }
 
     switch (format) {
-    case static_cast<uint16_t>(Format::PCM):
-        format_ = Format::PCM;
+    case static_cast<uint16_t>(Format::Pcm):
+        format_ = Format::Pcm;
         break;
     default:
         return false;
@@ -118,7 +121,7 @@ bool WavReader::open(void *file_context)
 
     block_alignment_ = block_alignment;
 
-    if (format_ == Format::PCM) {
+    if (format_ == Format::Pcm) {
         uint16_t bits_per_sample;
 
         if (!readU16(&bits_per_sample)) {
@@ -152,10 +155,18 @@ bool WavReader::open(void *file_context)
         }
 
         if (memcmp(chunk_id, "data", sizeof(chunk_id)) == 0) {
-            current_data_chunk_frames_ = 0;
-            next_data_chunk_offset_ = next_chunk_offset;
-            if ((next_data_chunk_offset_ & 1) != 0) {
-                next_data_chunk_offset_++;
+            if (!readU32(&chunk_size)) {
+                return false;
+            }
+
+            initial_data_chunk_offset_ = next_chunk_offset;
+            if ((initial_data_chunk_offset_ & 1) != 0) {
+                initial_data_chunk_offset_++;
+            }
+
+            final_data_chunk_offset_ = tell() + chunk_size;
+            if ((final_data_chunk_offset_ & 1) != 0) {
+                final_data_chunk_offset_++;
             }
 
             break;
@@ -176,10 +187,14 @@ bool WavReader::open(void *file_context)
                 return false;
             }
 
-            current_data_chunk_frames_ = 0;
-            next_data_chunk_offset_ = tell();
-            if ((next_data_chunk_offset_ & 1) != 0) {
-                next_data_chunk_offset_++;
+            initial_data_chunk_offset_ = tell();
+            if ((initial_data_chunk_offset_ & 1) != 0) {
+                initial_data_chunk_offset_++;
+            }
+
+            final_data_chunk_offset_ = tell() + chunk_size;
+            if ((final_data_chunk_offset_ & 1) != 0) {
+                final_data_chunk_offset_++;
             }
 
             break;
@@ -195,11 +210,24 @@ bool WavReader::open(void *file_context)
         }
     };
 
+    rewind();
+
     memset(frame_, 0, sizeof(frame_));
 
     opened_ = true;
 
     return true;
+}
+
+void WavReader::close()
+{
+    opened_ = false;
+}
+
+void WavReader::rewind()
+{
+    next_data_chunk_offset_ = initial_data_chunk_offset_;
+    current_data_chunk_frames_ = 0;
 }
 
 size_t WavReader::decodeToI16(int16_t *buffer, size_t frames)
@@ -312,7 +340,7 @@ bool WavReader::readCharBuffer(char *buffer, size_t length)
 bool WavReader::decodeNextFrame()
 {
     switch (format_) {
-    case Format::PCM:
+    case Format::Pcm:
         return decodeNextPcmFrame();
     }
 
@@ -325,6 +353,14 @@ bool WavReader::decodeNextPcmFrame()
     uint32_t chunk_size;
 
     if (current_data_chunk_frames_ == 0) {
+        if (next_data_chunk_offset_ == final_data_chunk_offset_) {
+            if (mode_ == Mode::Continuous) {
+                rewind();
+            } else {
+                return false;
+            }
+        }
+
         if (!seek(next_data_chunk_offset_)) {
             return false;
         }

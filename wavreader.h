@@ -10,9 +10,15 @@ public:
     typedef bool (*SeekCallback)(void *file_context, size_t offset);
     typedef size_t (*ReadCallback)(void *file_context, uint8_t *buffer, size_t length);
 
+    enum class Mode
+    {
+        Single,
+        Continuous
+    };
+
     enum class Format : unsigned int
     {
-        PCM = 1
+        Pcm = 1
     };
 
     static const unsigned int MAX_CHANNELS = 2;
@@ -24,7 +30,12 @@ public:
               SeekCallback seek_callback,
               ReadCallback read_callback);
 
-    bool open(void *file_context);
+    bool open(void *file_context,
+              Mode mode = Mode::Single);
+
+    void close();
+
+    void rewind();
 
     size_t decodeToI16(int16_t *buffer, size_t frames);
 
@@ -86,6 +97,8 @@ private:
 private:
     bool opened_;
 
+    Mode mode_;
+
     void *file_context_;
 
     TellCallback tell_callback_;
@@ -103,6 +116,8 @@ private:
     size_t frame_size_;
     size_t channel_size_;
 
+    size_t initial_data_chunk_offset_;
+    size_t final_data_chunk_offset_;
     size_t next_data_chunk_offset_;
     size_t current_data_chunk_frames_;
 
