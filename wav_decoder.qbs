@@ -13,9 +13,6 @@ Project {
 
         cpp.defines: "_REENTRANT"
 
-        // Workaround for Qt Creator code model issue
-        cpp.systemIncludePaths: cpp.compilerIncludePaths
-
         cpp.dynamicLibraries: [
             "pulse-simple",
             "pulse"
