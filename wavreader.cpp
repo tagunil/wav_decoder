@@ -320,7 +320,7 @@ bool WavReader::readU16(uint16_t *value)
         return false;
     }
 
-    value = le16toh(value);
+    *value = le16toh(*value);
 
     return true;
 }
@@ -332,7 +332,7 @@ bool WavReader::readU32(uint32_t *value)
         return false;
     }
 
-    value = le32toh(value);
+    *value = le32toh(*value);
 
     return true;
 }
