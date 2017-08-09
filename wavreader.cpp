@@ -154,11 +154,11 @@ bool WavReader::open(void *file_context,
             return false;
         }
 
-        if (memcmp(chunk_id, "data", sizeof(chunk_id)) == 0) {
-            if (!readU32(&chunk_size)) {
-                return false;
-            }
+        if (!readU32(&chunk_size)) {
+            return false;
+        }
 
+        if (memcmp(chunk_id, "data", sizeof(chunk_id)) == 0) {
             initial_data_chunk_offset_ = next_chunk_offset;
             if ((initial_data_chunk_offset_ & 1) != 0) {
                 initial_data_chunk_offset_++;
@@ -172,11 +172,12 @@ bool WavReader::open(void *file_context,
             break;
         }
 
-        if (memcmp(chunk_id, "LIST", sizeof(chunk_id)) == 0) {
-            if (!readU32(&chunk_size)) {
-                return false;
-            }
+        next_chunk_offset = tell() + chunk_size;
+        if ((next_chunk_offset & 1) != 0) {
+            next_chunk_offset++;
+        }
 
+        if (memcmp(chunk_id, "LIST", sizeof(chunk_id)) == 0) {
             char list_type[4];
 
             if (!readCharBuffer(list_type, sizeof(list_type))) {
@@ -184,7 +185,7 @@ bool WavReader::open(void *file_context,
             }
 
             if (memcmp(list_type, "wavl", sizeof(list_type)) != 0) {
-                return false;
+                continue;
             }
 
             initial_data_chunk_offset_ = tell();
@@ -198,15 +199,6 @@ bool WavReader::open(void *file_context,
             }
 
             break;
-        }
-
-        if (!readU32(&chunk_size)) {
-            return false;
-        }
-
-        next_chunk_offset = tell() + chunk_size;
-        if ((next_chunk_offset & 1) != 0) {
-            next_chunk_offset++;
         }
     };
 
