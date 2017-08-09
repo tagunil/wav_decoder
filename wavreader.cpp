@@ -1,7 +1,25 @@
 #include "wavreader.h"
 
 #include <cstring>
+
+#ifdef __GLIBC__
 #include <endian.h>
+#else
+#define swap16(x) ((uint16_t)((((x) & 0xff00) >> 8) | \
+                              (((x) & 0xff) << 8)))
+#define swap32(x) ((uint32_t)((((x) & 0xff000000) >> 24) | \
+                              (((x) & 0xff0000) >> 8) | \
+                              (((x) & 0xff00) << 8) | \
+                              (((x) & 0xff) << 24)))
+
+#if __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
+#define le16toh(x) ((uint16_t)(x))
+#define le32toh(x) ((uint32_t)(x))
+#else
+#define le16toh(x) ((uint16_t)(swap16(x)))
+#define le32toh(x) ((uint32_t)(swap32(x)))
+#endif
+#endif
 
 WavReader::WavReader(TellCallback tell_callback,
                      SeekCallback seek_callback,
