@@ -240,22 +240,24 @@ void WavReader::rewind()
     current_data_chunk_frames_ = 0;
 }
 
-size_t WavReader::decodeToI16(int16_t *buffer, size_t frames)
+size_t WavReader::decodeToI16(int16_t *buffer, size_t frames, unsigned int upmixing)
 {
     if (!opened_) {
         return 0;
     }
 
     if (channel_size_ == 1) {
-        return decodeUxToI16(buffer, frames);
+        return decodeUxToI16(buffer, frames, upmixing);
     } else {
-        return decodeIxToI16(buffer, frames);
+        return decodeIxToI16(buffer, frames, upmixing);
     }
 }
 
-size_t WavReader::decodeUxToI16(int16_t *buffer, size_t frames)
+inline size_t WavReader::decodeUxToI16(int16_t *buffer, size_t frames, unsigned int upmixing)
 {
-    int16_t sample = 0;
+    int16_t sample;
+
+    int16_t *frame_pointer = buffer;
 
     for (size_t frame_index = 0; frame_index < frames; frame_index++) {
         if (!decodeNextFrame()) {
@@ -266,16 +268,22 @@ size_t WavReader::decodeUxToI16(int16_t *buffer, size_t frames)
             sample = static_cast<int16_t>(frame_[channel]) - 128;
             sample = static_cast<int16_t>(sample << 8);
 
-            buffer[frame_index * channels_ + channel] = sample;
+            for (unsigned int copy = 0; copy < upmixing; copy++) {
+                frame_pointer[channel * upmixing + copy] = sample;
+            }
         }
+
+        frame_pointer += channels_ * upmixing;
     }
 
     return frames;
 }
 
-size_t WavReader::decodeIxToI16(int16_t *buffer, size_t frames)
+inline size_t WavReader::decodeIxToI16(int16_t *buffer, size_t frames, unsigned int upmixing)
 {
     int16_t sample;
+
+    int16_t *frame_pointer = buffer;
 
     for (size_t frame_index = 0; frame_index < frames; frame_index++) {
         if (!decodeNextFrame()) {
@@ -285,35 +293,37 @@ size_t WavReader::decodeIxToI16(int16_t *buffer, size_t frames)
         uint8_t *sample_pointer = frame_ + channel_size_ - sizeof(sample);
 
         for (unsigned int channel = 0; channel < channels_; channel++) {
-            memcpy(&sample,
-                   sample_pointer,
-                   sizeof(sample));
+            memcpy(&sample, sample_pointer, sizeof(sample));
 
             sample_pointer += channel_size_;
 
-            buffer[frame_index * channels_ + channel] = le16toh(sample);
+            for (unsigned int copy = 0; copy < upmixing; copy++) {
+                frame_pointer[channel * upmixing + copy] = le16toh(sample);
+            }
         }
+
+        frame_pointer += channels_ * upmixing;
     }
 
     return frames;
 }
 
-size_t WavReader::tell()
+inline size_t WavReader::tell()
 {
     return tell_callback_(file_context_);
 }
 
-bool WavReader::seek(size_t offset)
+inline bool WavReader::seek(size_t offset)
 {
     return seek_callback_(file_context_, offset);
 }
 
-size_t WavReader::read(uint8_t *buffer, size_t length)
+inline size_t WavReader::read(uint8_t *buffer, size_t length)
 {
     return read_callback_(file_context_, buffer, length);
 }
 
-bool WavReader::readU16(uint16_t *value)
+inline bool WavReader::readU16(uint16_t *value)
 {
     if (read(reinterpret_cast<uint8_t *>(value),
              sizeof(uint16_t)) < sizeof(uint16_t)) {
@@ -325,7 +335,7 @@ bool WavReader::readU16(uint16_t *value)
     return true;
 }
 
-bool WavReader::readU32(uint32_t *value)
+inline bool WavReader::readU32(uint32_t *value)
 {
     if (read(reinterpret_cast<uint8_t *>(value),
              sizeof(uint32_t)) < sizeof(uint32_t)) {
@@ -337,7 +347,7 @@ bool WavReader::readU32(uint32_t *value)
     return true;
 }
 
-bool WavReader::readCharBuffer(char *buffer, size_t length)
+inline bool WavReader::readCharBuffer(char *buffer, size_t length)
 {
     if (read(reinterpret_cast<uint8_t *>(buffer),
              length) < length) {
@@ -347,7 +357,7 @@ bool WavReader::readCharBuffer(char *buffer, size_t length)
     return true;
 }
 
-bool WavReader::decodeNextFrame()
+inline bool WavReader::decodeNextFrame()
 {
     switch (format_) {
     case Format::Pcm:

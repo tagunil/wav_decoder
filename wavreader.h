@@ -37,7 +37,7 @@ public:
 
     void rewind();
 
-    size_t decodeToI16(int16_t *buffer, size_t frames);
+    size_t decodeToI16(int16_t *buffer, size_t frames, unsigned int upmixing = 1);
 
     bool opened()
     {
@@ -80,19 +80,19 @@ public:
     }
 
 private:
-    size_t tell();
-    bool seek(size_t offset);
-    size_t read(uint8_t *buffer, size_t length);
+    inline size_t tell();
+    inline bool seek(size_t offset);
+    inline size_t read(uint8_t *buffer, size_t length);
 
-    bool readU16(uint16_t *value);
-    bool readU32(uint32_t *value);
-    bool readCharBuffer(char *buffer, size_t length);
+    inline bool readU16(uint16_t *value);
+    inline bool readU32(uint32_t *value);
+    inline bool readCharBuffer(char *buffer, size_t length);
 
-    bool decodeNextFrame();
+    inline bool decodeNextFrame();
     bool decodeNextPcmFrame();
 
-    size_t decodeUxToI16(int16_t *buffer, size_t frames);
-    size_t decodeIxToI16(int16_t *buffer, size_t frames);
+    inline size_t decodeUxToI16(int16_t *buffer, size_t frames, unsigned int upmixing = 1);
+    inline size_t decodeIxToI16(int16_t *buffer, size_t frames, unsigned int upmixing = 1);
 
 private:
     bool opened_;
