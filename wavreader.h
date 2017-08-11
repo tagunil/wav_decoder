@@ -122,7 +122,7 @@ private:
     size_t next_data_chunk_offset_;
     size_t current_data_chunk_frames_;
 
-    uint8_t frame_buffer_[WAVREADER_BUFFER_SIZE];
+    alignas(4) uint8_t frame_buffer_[WAVREADER_BUFFER_SIZE];
     size_t prefetched_frames_;
     uint8_t *current_frame_;
     uint8_t *next_frame_;
