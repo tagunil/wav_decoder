@@ -273,6 +273,12 @@ size_t WavReader::decodeToI16(int16_t *buffer, size_t frames, unsigned int upmix
                     }
                 }
             }
+#if __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
+        } else if ((channel_size_ == 2) && (upmixing == 1)) {
+            size_t samples = decoded_frames * channels_;
+            memcpy(frame_pointer, current_frame_, samples * 2);
+            frame_pointer += samples;
+#endif
         } else {
             uint8_t *sample_pointer = current_frame_ + channel_size_ - 2;
 
