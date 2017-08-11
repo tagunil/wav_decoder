@@ -238,7 +238,7 @@ void WavReader::rewind()
     current_data_chunk_frames_ = 0;
 
     memset(frame_buffer_, 0, MAX_FRAME_SIZE);
-    recent_frame_ = frame_buffer_;
+    current_frame_ = frame_buffer_;
     prefetched_frames_ = 0;
 }
 
@@ -248,70 +248,53 @@ size_t WavReader::decodeToI16(int16_t *buffer, size_t frames, unsigned int upmix
         return 0;
     }
 
-    if (channel_size_ == 1) {
-        return decodeUxToI16(buffer, frames, upmixing);
-    } else {
-        return decodeIxToI16(buffer, frames, upmixing);
-    }
-}
-
-inline size_t WavReader::decodeUxToI16(int16_t *buffer, size_t frames, unsigned int upmixing)
-{
-    int16_t sample;
-
     int16_t *frame_pointer = buffer;
+    size_t processed_frames = 0;
 
-    for (size_t frame_index = 0; frame_index < frames; frame_index++) {
-        if (!decodeNextFrame()) {
-            return frame_index;
+    while (processed_frames < frames) {
+        size_t decoded_frames = decodeNextFrames(frames - processed_frames);
+        if (decoded_frames == 0) {
+            break;
         }
 
-        uint8_t *sample_pointer = recent_frame_;
+        if (channel_size_ == 1) {
+            uint8_t *sample_pointer = current_frame_;
 
-        for (unsigned int channel = 0; channel < channels_; channel++) {
-            sample = static_cast<int16_t>(*sample_pointer) - 128;
-            sample = static_cast<int16_t>(sample << 8);
+            for (size_t frame_index = 0; frame_index < decoded_frames; frame_index++) {
+                for (unsigned int channel = 0; channel < channels_; channel++) {
+                    int16_t sample;
+                    sample = static_cast<int16_t>(*sample_pointer) - 128;
+                    sample = static_cast<int16_t>(sample << 8);
+                    sample_pointer++;
 
-            sample_pointer++;
+                    for (unsigned int copy = 0; copy < upmixing; copy++) {
+                        *frame_pointer = sample;
+                        frame_pointer++;
+                    }
+                }
+            }
+        } else {
+            uint8_t *sample_pointer = current_frame_ + channel_size_ - 2;
 
-            for (unsigned int copy = 0; copy < upmixing; copy++) {
-                frame_pointer[channel * upmixing + copy] = sample;
+            for (size_t frame_index = 0; frame_index < decoded_frames; frame_index++) {
+                for (unsigned int channel = 0; channel < channels_; channel++) {
+                    int16_t sample;
+                    memcpy(&sample, sample_pointer, 2);
+                    sample = le16toh(sample);
+                    sample_pointer += channel_size_;
+
+                    for (unsigned int copy = 0; copy < upmixing; copy++) {
+                        *frame_pointer = sample;
+                        frame_pointer++;
+                    }
+                }
             }
         }
 
-        frame_pointer += channels_ * upmixing;
+        processed_frames += decoded_frames;
     }
 
-    return frames;
-}
-
-inline size_t WavReader::decodeIxToI16(int16_t *buffer, size_t frames, unsigned int upmixing)
-{
-    int16_t sample;
-
-    int16_t *frame_pointer = buffer;
-
-    for (size_t frame_index = 0; frame_index < frames; frame_index++) {
-        if (!decodeNextFrame()) {
-            return frame_index;
-        }
-
-        uint8_t *sample_pointer = recent_frame_ + channel_size_ - 2;
-
-        for (unsigned int channel = 0; channel < channels_; channel++) {
-            memcpy(&sample, sample_pointer, 2);
-
-            sample_pointer += channel_size_;
-
-            for (unsigned int copy = 0; copy < upmixing; copy++) {
-                frame_pointer[channel * upmixing + copy] = le16toh(sample);
-            }
-        }
-
-        frame_pointer += channels_ * upmixing;
-    }
-
-    return frames;
+    return processed_frames;
 }
 
 inline size_t WavReader::tell()
@@ -363,17 +346,17 @@ inline bool WavReader::readCharBuffer(char *buffer, size_t length)
     return true;
 }
 
-inline bool WavReader::decodeNextFrame()
+inline size_t WavReader::decodeNextFrames(size_t frames)
 {
     switch (format_) {
     case Format::Pcm:
-        return decodeNextPcmFrame();
+        return decodeNextPcmFrames(frames);
     }
 
-    return false;
+    return 0;
 }
 
-bool WavReader::decodeNextPcmFrame()
+size_t WavReader::decodeNextPcmFrames(size_t frames)
 {
     char chunk_id[4];
     uint32_t chunk_size;
@@ -383,16 +366,16 @@ bool WavReader::decodeNextPcmFrame()
             if (mode_ == Mode::Continuous) {
                 rewind();
             } else {
-                return false;
+                return 0;
             }
         }
 
         if (!seek(next_data_chunk_offset_)) {
-            return false;
+            return 0;
         }
 
         if (!readCharBuffer(chunk_id, sizeof(chunk_id))) {
-            return false;
+            return 0;
         }
 
         if (memcmp(chunk_id, "data", sizeof(chunk_id)) == 0) {
@@ -400,11 +383,11 @@ bool WavReader::decodeNextPcmFrame()
         } else if (memcmp(chunk_id, "slnt", sizeof(chunk_id)) == 0) {
             silence_ = true;
         } else {
-            return false;
+            return 0;
         }
 
         if (!readU32(&chunk_size)) {
-            return false;
+            return 0;
         }
 
         if (!silence_) {
@@ -413,7 +396,7 @@ bool WavReader::decodeNextPcmFrame()
             uint32_t silent_frames;
 
             if (!readU32(&silent_frames)) {
-                return false;
+                return 0;
             }
 
             current_data_chunk_frames_ = silent_frames;
@@ -437,18 +420,26 @@ bool WavReader::decodeNextPcmFrame()
 
             size_t read_frames = read_bytes / frame_size_;
             if (read_frames == 0) {
-                return false;
+                return 0;
             }
 
-            recent_frame_ = frame_buffer_;
-            prefetched_frames_ = read_frames - 1;
+            current_frame_ = frame_buffer_;
+            prefetched_frames_ = read_frames;
         } else {
-            recent_frame_ += frame_size_;
-            prefetched_frames_--;
+            current_frame_ = next_frame_;
         }
+
+        if (frames > prefetched_frames_) {
+            frames = prefetched_frames_;
+        }
+
+        next_frame_ = current_frame_ + frame_size_ * frames;
+        prefetched_frames_ -= frames;
+    } else {
+        frames = 1;
     }
 
     current_data_chunk_frames_--;
 
-    return true;
+    return frames;
 }

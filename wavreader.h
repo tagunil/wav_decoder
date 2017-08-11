@@ -92,11 +92,8 @@ private:
     inline bool readU32(uint32_t *value);
     inline bool readCharBuffer(char *buffer, size_t length);
 
-    inline bool decodeNextFrame();
-    bool decodeNextPcmFrame();
-
-    inline size_t decodeUxToI16(int16_t *buffer, size_t frames, unsigned int upmixing = 1);
-    inline size_t decodeIxToI16(int16_t *buffer, size_t frames, unsigned int upmixing = 1);
+    inline size_t decodeNextFrames(size_t frames);
+    size_t decodeNextPcmFrames(size_t frames);
 
 private:
     bool opened_;
@@ -127,7 +124,8 @@ private:
 
     uint8_t frame_buffer_[WAVREADER_BUFFER_SIZE];
     size_t prefetched_frames_;
-    uint8_t *recent_frame_;
+    uint8_t *current_frame_;
+    uint8_t *next_frame_;
 
     bool silence_;
 };
