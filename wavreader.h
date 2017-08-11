@@ -125,11 +125,9 @@ private:
     size_t next_data_chunk_offset_;
     size_t current_data_chunk_frames_;
 
-    uint8_t frame_[MAX_FRAME_SIZE];
-
-    uint8_t prefetch_buffer_[WAVREADER_BUFFER_SIZE];
-    size_t prefetch_buffer_frames_;
-    size_t prefetch_buffer_position_;
+    uint8_t frame_buffer_[WAVREADER_BUFFER_SIZE];
+    size_t prefetched_frames_;
+    uint8_t *recent_frame_;
 
     bool silence_;
 };

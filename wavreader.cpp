@@ -222,10 +222,6 @@ bool WavReader::open(void *file_context,
 
     rewind();
 
-    memset(frame_, 0, sizeof(frame_));
-
-    prefetch_buffer_frames_ = 0;
-
     opened_ = true;
 
     return true;
@@ -240,7 +236,10 @@ void WavReader::rewind()
 {
     next_data_chunk_offset_ = initial_data_chunk_offset_;
     current_data_chunk_frames_ = 0;
-    prefetch_buffer_frames_ = 0;
+
+    memset(frame_buffer_, 0, MAX_FRAME_SIZE);
+    recent_frame_ = frame_buffer_;
+    prefetched_frames_ = 0;
 }
 
 size_t WavReader::decodeToI16(int16_t *buffer, size_t frames, unsigned int upmixing)
@@ -268,7 +267,7 @@ inline size_t WavReader::decodeUxToI16(int16_t *buffer, size_t frames, unsigned 
         }
 
         for (unsigned int channel = 0; channel < channels_; channel++) {
-            sample = static_cast<int16_t>(frame_[channel]) - 128;
+            sample = static_cast<int16_t>(recent_frame_[channel]) - 128;
             sample = static_cast<int16_t>(sample << 8);
 
             for (unsigned int copy = 0; copy < upmixing; copy++) {
@@ -293,7 +292,7 @@ inline size_t WavReader::decodeIxToI16(int16_t *buffer, size_t frames, unsigned 
             return frame_index;
         }
 
-        uint8_t *sample_pointer = frame_ + channel_size_ - sizeof(sample);
+        uint8_t *sample_pointer = recent_frame_ + channel_size_ - sizeof(sample);
 
         for (unsigned int channel = 0; channel < channels_; channel++) {
             memcpy(&sample, sample_pointer, sizeof(sample));
@@ -423,27 +422,26 @@ bool WavReader::decodeNextPcmFrame()
     }
 
     if (!silence_) {
-        if (prefetch_buffer_frames_ == 0) {
+        if (prefetched_frames_ == 0) {
             size_t frames_to_read = WAVREADER_BUFFER_SIZE / frame_size_;
             if (frames_to_read > current_data_chunk_frames_) {
                 frames_to_read = current_data_chunk_frames_;
             }
 
             size_t bytes_to_read = frames_to_read * frame_size_;
-            size_t read_bytes = read(prefetch_buffer_, bytes_to_read);
+            size_t read_bytes = read(frame_buffer_, bytes_to_read);
 
             size_t read_frames = read_bytes / frame_size_;
             if (read_frames == 0) {
                 return false;
             }
 
-            prefetch_buffer_frames_ = read_frames;
-            prefetch_buffer_position_ = 0;
+            recent_frame_ = frame_buffer_;
+            prefetched_frames_ = read_frames - 1;
+        } else {
+            recent_frame_ += frame_size_;
+            prefetched_frames_--;
         }
-
-        memcpy(frame_, prefetch_buffer_ + prefetch_buffer_position_, frame_size_);
-        prefetch_buffer_frames_--;
-        prefetch_buffer_position_ += frame_size_;
     }
 
     current_data_chunk_frames_--;
