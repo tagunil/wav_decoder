@@ -266,9 +266,13 @@ inline size_t WavReader::decodeUxToI16(int16_t *buffer, size_t frames, unsigned 
             return frame_index;
         }
 
+        uint8_t *sample_pointer = recent_frame_;
+
         for (unsigned int channel = 0; channel < channels_; channel++) {
-            sample = static_cast<int16_t>(recent_frame_[channel]) - 128;
+            sample = static_cast<int16_t>(*sample_pointer) - 128;
             sample = static_cast<int16_t>(sample << 8);
+
+            sample_pointer++;
 
             for (unsigned int copy = 0; copy < upmixing; copy++) {
                 frame_pointer[channel * upmixing + copy] = sample;
@@ -292,10 +296,10 @@ inline size_t WavReader::decodeIxToI16(int16_t *buffer, size_t frames, unsigned 
             return frame_index;
         }
 
-        uint8_t *sample_pointer = recent_frame_ + channel_size_ - sizeof(sample);
+        uint8_t *sample_pointer = recent_frame_ + channel_size_ - 2;
 
         for (unsigned int channel = 0; channel < channels_; channel++) {
-            memcpy(&sample, sample_pointer, sizeof(sample));
+            memcpy(&sample, sample_pointer, 2);
 
             sample_pointer += channel_size_;
 
