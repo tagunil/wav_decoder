@@ -445,7 +445,7 @@ size_t WavReader::decodeNextPcmFrames(size_t frames)
         frames = 1;
     }
 
-    current_data_chunk_frames_--;
+    current_data_chunk_frames_ -= frames;
 
     return frames;
 }
