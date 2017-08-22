@@ -45,16 +45,6 @@ int main(int argc, char *argv[])
         return 1;
     }
 
-    FILE *wav_file = fopen(argv[1], "r");
-    if (wav_file == nullptr) {
-        fprintf(stderr, "Cannot open file \"%s\"\n", argv[1]);
-        return 1;
-    }
-
-    WavReader reader(&tell_callback,
-                     &seek_callback,
-                     &read_callback);
-
     WavReader::Mode mode = WavReader::Mode::Single;
 
     if (argc >= 3) {
@@ -77,8 +67,19 @@ int main(int argc, char *argv[])
         break;
     }
 
+    FILE *wav_file = fopen(argv[1], "r");
+    if (wav_file == nullptr) {
+        fprintf(stderr, "Cannot open file \"%s\"\n", argv[1]);
+        return 1;
+    }
+
+    WavReader reader(&tell_callback,
+                     &seek_callback,
+                     &read_callback);
+
     if (!reader.open(wav_file, mode)) {
         fprintf(stderr, "Cannot parse WAV file header\n");
+        fclose(wav_file);
         return 1;
     }
 
@@ -121,6 +122,8 @@ int main(int argc, char *argv[])
         fprintf(stderr,
                 "pa_simple_new() failed: %s\n",
                 pa_strerror(error));
+        reader.close();
+        fclose(wav_file);
         return 1;
     }
 
@@ -141,6 +144,8 @@ int main(int argc, char *argv[])
                     "pa_simple_write() failed: %s\n",
                     pa_strerror(error));
             pa_simple_free(stream);
+            reader.close();
+            fclose(wav_file);
             return 1;
         }
     }
@@ -150,10 +155,14 @@ int main(int argc, char *argv[])
                 "pa_simple_drain() failed: %s\n",
                 pa_strerror(error));
         pa_simple_free(stream);
+        reader.close();
+        fclose(wav_file);
         return 1;
     }
 
     pa_simple_free(stream);
+    reader.close();
+    fclose(wav_file);
 
     return 0;
 }
