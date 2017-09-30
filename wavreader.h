@@ -48,6 +48,11 @@ public:
         return opened_;
     }
 
+    Mode mode()
+    {
+        return mode_;
+    }
+
     Format format()
     {
         return format_;
