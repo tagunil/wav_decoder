@@ -32,7 +32,8 @@ WavReader::WavReader(TellCallback tell_callback,
 }
 
 bool WavReader::open(void *file_context,
-                     WavReader::Mode mode)
+                     WavReader::Mode mode,
+                     bool preload)
 {
     char chunk_id[4];
     uint32_t chunk_size;
@@ -220,9 +221,9 @@ bool WavReader::open(void *file_context,
         }
     };
 
-    rewind();
-
     opened_ = true;
+
+    rewind(preload);
 
     return true;
 }
@@ -232,7 +233,7 @@ void WavReader::close()
     opened_ = false;
 }
 
-void WavReader::rewind()
+void WavReader::rewind(bool preload)
 {
     next_data_chunk_offset_ = initial_data_chunk_offset_;
     current_data_chunk_frames_ = 0;
@@ -240,6 +241,10 @@ void WavReader::rewind()
     memset(frame_buffer_, 0, MAX_FRAME_SIZE);
     current_frame_ = frame_buffer_;
     prefetched_frames_ = 0;
+
+    if (preload) {
+        prefetchNextFrames();
+    }
 }
 
 size_t WavReader::decodeToI16(int16_t *buffer, size_t frames, unsigned int upmixing)
@@ -416,21 +421,11 @@ size_t WavReader::decodeNextPcmFrames(size_t frames)
 
     if (!silence_) {
         if (prefetched_frames_ == 0) {
-            size_t frames_to_read = WAVREADER_BUFFER_SIZE / frame_size_;
-            if (frames_to_read > current_data_chunk_frames_) {
-                frames_to_read = current_data_chunk_frames_;
-            }
-
-            size_t bytes_to_read = frames_to_read * frame_size_;
-            size_t read_bytes = read(frame_buffer_, bytes_to_read);
-
-            size_t read_frames = read_bytes / frame_size_;
-            if (read_frames == 0) {
+            if (prefetchNextFrames() < 1) {
                 return 0;
             }
 
             current_frame_ = frame_buffer_;
-            prefetched_frames_ = read_frames;
         } else {
             current_frame_ = next_frame_;
         }
@@ -448,4 +443,25 @@ size_t WavReader::decodeNextPcmFrames(size_t frames)
     current_data_chunk_frames_ -= frames;
 
     return frames;
+}
+
+size_t WavReader::prefetchNextFrames()
+{
+    if (!opened_) {
+        return 0;
+    }
+
+    size_t frames_to_read = WAVREADER_BUFFER_SIZE / frame_size_;
+    if (frames_to_read > current_data_chunk_frames_) {
+        frames_to_read = current_data_chunk_frames_;
+    }
+
+    size_t bytes_to_read = frames_to_read * frame_size_;
+    size_t read_bytes = read(frame_buffer_, bytes_to_read);
+
+    size_t read_frames = read_bytes / frame_size_;
+
+    prefetched_frames_ = read_frames;
+
+    return read_frames;
 }

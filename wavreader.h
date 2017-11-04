@@ -35,11 +35,12 @@ public:
               ReadCallback read_callback);
 
     bool open(void *file_context,
-              Mode mode = Mode::Single);
+              Mode mode = Mode::Single,
+              bool preload = true);
 
     void close();
 
-    void rewind();
+    void rewind(bool preload = true);
 
     size_t decodeToI16(int16_t *buffer, size_t frames, unsigned int upmixing = 1);
 
@@ -99,6 +100,8 @@ private:
 
     inline size_t decodeNextFrames(size_t frames);
     size_t decodeNextPcmFrames(size_t frames);
+
+    size_t prefetchNextFrames();
 
 private:
     bool opened_;

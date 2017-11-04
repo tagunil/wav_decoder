@@ -77,7 +77,7 @@ int main(int argc, char *argv[])
                      &seek_callback,
                      &read_callback);
 
-    if (!reader.open(wav_file, mode)) {
+    if (!reader.open(wav_file, mode, true)) {
         fprintf(stderr, "Cannot parse WAV file header\n");
         fclose(wav_file);
         return 1;
