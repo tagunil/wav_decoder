@@ -240,10 +240,15 @@ void WavReader::rewind(bool preload)
 
     memset(frame_buffer_, 0, MAX_FRAME_SIZE);
     current_frame_ = frame_buffer_;
+    next_frame_ = frame_buffer_;
     prefetched_frames_ = 0;
 
     if (preload) {
-        prefetchNextFrames();
+        if (prepareCurrentChunk()) {
+            if (!silence_) {
+                prefetchNextFrames();
+            }
+        }
     }
 }
 
@@ -369,54 +374,8 @@ inline size_t WavReader::decodeNextFrames(size_t frames)
 
 size_t WavReader::decodeNextPcmFrames(size_t frames)
 {
-    char chunk_id[4];
-    uint32_t chunk_size;
-
-    if (current_data_chunk_frames_ == 0) {
-        if (next_data_chunk_offset_ == final_data_chunk_offset_) {
-            if (mode_ == Mode::Continuous) {
-                rewind();
-            } else {
-                return 0;
-            }
-        }
-
-        if (!seek(next_data_chunk_offset_)) {
-            return 0;
-        }
-
-        if (!readCharBuffer(chunk_id, sizeof(chunk_id))) {
-            return 0;
-        }
-
-        if (memcmp(chunk_id, "data", sizeof(chunk_id)) == 0) {
-            silence_ = false;
-        } else if (memcmp(chunk_id, "slnt", sizeof(chunk_id)) == 0) {
-            silence_ = true;
-        } else {
-            return 0;
-        }
-
-        if (!readU32(&chunk_size)) {
-            return 0;
-        }
-
-        if (!silence_) {
-            current_data_chunk_frames_ = chunk_size / frame_size_;
-        } else {
-            uint32_t silent_frames;
-
-            if (!readU32(&silent_frames)) {
-                return 0;
-            }
-
-            current_data_chunk_frames_ = silent_frames;
-        }
-
-        next_data_chunk_offset_ = tell() + chunk_size;
-        if ((next_data_chunk_offset_ & 1) != 0) {
-            next_data_chunk_offset_++;
-        }
+    if (!prepareCurrentChunk()) {
+        return 0;
     }
 
     if (!silence_) {
@@ -425,10 +384,10 @@ size_t WavReader::decodeNextPcmFrames(size_t frames)
                 return 0;
             }
 
-            current_frame_ = frame_buffer_;
-        } else {
-            current_frame_ = next_frame_;
+            next_frame_ = frame_buffer_;
         }
+
+        current_frame_ = next_frame_;
 
         if (frames > prefetched_frames_) {
             frames = prefetched_frames_;
@@ -445,12 +404,63 @@ size_t WavReader::decodeNextPcmFrames(size_t frames)
     return frames;
 }
 
-size_t WavReader::prefetchNextFrames()
+bool WavReader::prepareCurrentChunk()
 {
-    if (!opened_) {
-        return 0;
+    if (current_data_chunk_frames_ == 0) {
+        if (next_data_chunk_offset_ == final_data_chunk_offset_) {
+            if (mode_ == Mode::Continuous) {
+                rewind(false);
+            } else {
+                return false;
+            }
+        }
+
+        if (!seek(next_data_chunk_offset_)) {
+            return false;
+        }
+
+        char chunk_id[4];
+        uint32_t chunk_size;
+
+        if (!readCharBuffer(chunk_id, sizeof(chunk_id))) {
+            return false;
+        }
+
+        if (memcmp(chunk_id, "data", sizeof(chunk_id)) == 0) {
+            silence_ = false;
+        } else if (memcmp(chunk_id, "slnt", sizeof(chunk_id)) == 0) {
+            silence_ = true;
+        } else {
+            return false;
+        }
+
+        if (!readU32(&chunk_size)) {
+            return false;
+        }
+
+        if (!silence_) {
+            current_data_chunk_frames_ = chunk_size / frame_size_;
+        } else {
+            uint32_t silent_frames;
+
+            if (!readU32(&silent_frames)) {
+                return false;
+            }
+
+            current_data_chunk_frames_ = silent_frames;
+        }
+
+        next_data_chunk_offset_ = tell() + chunk_size;
+        if ((next_data_chunk_offset_ & 1) != 0) {
+            next_data_chunk_offset_++;
+        }
     }
 
+    return true;
+}
+
+size_t WavReader::prefetchNextFrames()
+{
     size_t frames_to_read = WAVREADER_BUFFER_SIZE / frame_size_;
     if (frames_to_read > current_data_chunk_frames_) {
         frames_to_read = current_data_chunk_frames_;

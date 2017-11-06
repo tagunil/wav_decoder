@@ -101,6 +101,7 @@ private:
     inline size_t decodeNextFrames(size_t frames);
     size_t decodeNextPcmFrames(size_t frames);
 
+    bool prepareCurrentChunk();
     size_t prefetchNextFrames();
 
 private:
