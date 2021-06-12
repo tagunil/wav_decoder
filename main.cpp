@@ -88,6 +88,11 @@ int main(int argc, char *argv[])
     case WavReader::Format::Pcm:
         printf("PCM\n");
         break;
+#ifdef HAS_IEEE_FLOAT
+    case WavReader::Format::IeeeFloat:
+        printf("IEEE float\n");
+        break;
+#endif
     }
 
     printf("Channels: %u\n", reader.channels());

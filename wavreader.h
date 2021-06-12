@@ -17,12 +17,15 @@ public:
     enum class Mode
     {
         Single,
-        Continuous
+        Continuous,
     };
 
     enum class Format : unsigned int
     {
-        Pcm = 1
+        Pcm = 1,
+#ifdef HAS_IEEE_FLOAT
+        IeeeFloat = 3,
+#endif
     };
 
     static const unsigned int MAX_CHANNELS = 2;
@@ -103,7 +106,13 @@ private:
     inline bool readCharBuffer(char *buffer, size_t length);
 
     inline size_t decodeNextFrames(size_t frames);
+
     size_t decodeNextPcmFrames(size_t frames);
+#ifdef HAS_IEEE_FLOAT
+    size_t decodeNextIeeeFloatFrames(size_t frames);
+#endif
+
+    size_t retrieveNextFrames(size_t frames);
 
     bool prepareCurrentChunk();
     size_t prefetchNextFrames();
