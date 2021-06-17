@@ -13,11 +13,15 @@
                               (((x) & 0xff) << 24)))
 
 #if __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
+#define htole16(x) ((uint16_t)(x))
 #define le16toh(x) ((uint16_t)(x))
+#define htole32(x) ((uint32_t)(x))
 #define le32toh(x) ((uint32_t)(x))
 #else
 #define le16toh(x) ((uint16_t)(swap16(x)))
+#define htole16(x) ((uint16_t)(swap16(x)))
 #define le32toh(x) ((uint32_t)(swap32(x)))
+#define htole32(x) ((uint32_t)(swap32(x)))
 #endif
 #endif
 
